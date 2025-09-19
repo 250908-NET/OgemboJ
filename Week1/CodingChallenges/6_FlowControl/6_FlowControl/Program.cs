@@ -19,7 +19,14 @@ namespace _6_FlowControl
         /// <returns></returns>
         public static int GetValidTemperature()
         {
-            throw new NotImplementedException($"GetValidTemperature() has not been implemented.");
+            int temp = int.Parse(Console.ReadLine());
+
+            if (temp < -40 || temp > 135)
+            {
+                Console.WriteLine("Invalid temp");
+            }
+            return temp;
+
         }
 
         /// <summary>
@@ -39,7 +46,41 @@ namespace _6_FlowControl
         /// <param name="temp"></param>
         public static void GiveActivityAdvice(int temp)
         {
-            throw new NotImplementedException($"GiveActivityAdvice() has not been implemented.");
+            //throw new NotImplementedException($"GiveActivityAdvice() has not been implemented.");
+
+            switch (temp)
+            {
+                case < -20:
+                    Console.WriteLine("hella cold");
+                    break;
+                case >= -20 and < 0:
+                    Console.WriteLine("pretty cold");
+                    break;
+                case >= 0 and < 20:
+                    Console.WriteLine("cold");
+                    break;
+                case >= 20 and < 40:
+                    Console.WriteLine("thawed out");
+                    break;
+                case >= 40 and < 60:
+                    Console.WriteLine("feels like Autumn");
+                    break;
+                case >= 60 and < 80:
+                    Console.WriteLine("perfect outdoor workout temperature");
+                    break;
+                case >= 80 and < 90:
+                    Console.WriteLine("niiice");
+                    break;
+                case >= 90 and < 100:
+                    Console.WriteLine("hella hot");
+                    break;
+                case >= 100 and <= 135:
+                    Console.WriteLine("hottest");
+                    break;
+                default:
+                    Console.WriteLine("Crazy");
+                    break;
+            }
         }
 
         /// <summary>
@@ -47,9 +88,17 @@ namespace _6_FlowControl
         /// and stores that data in the global variables of the 
         /// names in the method.
         /// </summary>
+        ///
+        public static string username;
+        public static string password;
         public static void Register()
         {
-            throw new NotImplementedException($"Register() has not been implemented.");
+            //throw new NotImplementedException($"Register() has not been implemented.");
+
+            username = Console.ReadLine();
+            password = Console.ReadLine();
+
+            Console.WriteLine($"{username} saved");
         }
 
         /// <summary>
@@ -62,8 +111,28 @@ namespace _6_FlowControl
         /// <returns></returns>
         public static bool Login()
         {
-            throw new NotImplementedException($"Login() has not been implemented.");
+            while (true)
+            {
+
+                Console.Write("Enter username: ");
+                string usern = Console.ReadLine();
+
+                Console.Write("Enter password: ");
+                string passwordn = Console.ReadLine();
+
+                if (usern == username && passwordn == password)
+                {
+
+                    return true;
+                }
+                else
+                {
+                    Console.WriteLine("Invalid credentials. Try again.");
+                }
+            }
+
         }
+
 
         /// <summary>
         /// This method has one int parameter.
@@ -75,7 +144,18 @@ namespace _6_FlowControl
         /// <param name="temp"></param>
         public static void GetTemperatureTernary(int temp)
         {
-            throw new NotImplementedException($"GetTemperatureTernary() has not been implemented.");
+            if (temp <= 42)
+            {
+                Console.WriteLine($"{temp} is too cold!");
+            }
+            else if (temp <= 78)
+            {
+                Console.WriteLine($"{temp} is an ok temperature");
+            }
+            else
+            {
+                Console.WriteLine($"{temp} is too hot!");
+            }
         }
     }//EoP
 }//EoN
