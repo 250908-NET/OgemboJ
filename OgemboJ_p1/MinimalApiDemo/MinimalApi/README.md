@@ -21,3 +21,30 @@ This repo will evolve step by step to include:
 ```bash
 dotnet build
 dotnet run --project MinimalApi/MinimalApi.csproj
+
+
+## Entity Relationship Diagram
+erDiagram
+    STUDENTS ||--o{ ENROLLMENTS : "has many"
+    COURSES  ||--o{ ENROLLMENTS : "has many"
+
+    STUDENTS {
+        int Id PK
+        string FullName
+        string Email
+        datetime CreatedAt
+    }
+
+    COURSES {
+        int Id PK
+        string Title
+        string Code
+        int Credits
+    }
+
+    ENROLLMENTS {
+        int StudentId FK
+        int CourseId  FK
+        datetime EnrolledOn
+        string Grade
+    }
