@@ -4,6 +4,9 @@ using PaymentGateway.Api.Data;
 using PaymentGateway.Api.Domain;
 using FluentAssertions;
 
+
+
+
 namespace PaymentGateway.Tests;
 
 public class PaymentTests
@@ -62,7 +65,7 @@ public class PaymentTests
         var merchant = await db.Merchants.FirstAsync();
         var customer = await db.Customers.FirstAsync();
 
-        // PaymentMethod 2 not linked to merchant
+    
         db.PaymentMethods.Add(new PaymentMethod { Id = 2, Code = "MPESA", DisplayName = "M-Pesa" });
         await db.SaveChangesAsync();
 

@@ -3,8 +3,12 @@ using PaymentGateway.Api.Domain;
 
 namespace PaymentGateway.Api.Data;
 
-public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(options)
+public class AppDbContext : DbContext
 {
+    public AppDbContext(DbContextOptions<AppDbContext> options) : base(options)
+    {
+    }
+
     public DbSet<Merchant> Merchants => Set<Merchant>();
     public DbSet<Customer> Customers => Set<Customer>();
     public DbSet<PaymentMethod> PaymentMethods => Set<PaymentMethod>();
@@ -29,9 +33,9 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         modelBuilder.Entity<Payment>()
             .Property(p => p.Amount).HasColumnType("decimal(18,2)");
 
-        // Seed a couple PaymentMethods
+
         modelBuilder.Entity<PaymentMethod>().HasData(
-            new PaymentMethod { Id = 1, Code = "CARD",  DisplayName = "Card" },
+            new PaymentMethod { Id = 1, Code = "CARD", DisplayName = "Card" },
             new PaymentMethod { Id = 2, Code = "MPESA", DisplayName = "M-Pesa" }
         );
     }

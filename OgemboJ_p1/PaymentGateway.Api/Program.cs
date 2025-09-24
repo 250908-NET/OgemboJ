@@ -1,3 +1,4 @@
+using System.Linq;
 using Microsoft.EntityFrameworkCore;
 using PaymentGateway.Api.Contracts;
 using PaymentGateway.Api.Data;
@@ -7,15 +8,26 @@ var builder = WebApplication.CreateBuilder(args);
 
 
 builder.Services.AddDbContext<AppDbContext>(opt =>
-    opt.UseSqlServer(builder.Configuration.GetConnectionString("Default")));
+{
+    var useInMemory = builder.Configuration.GetValue<bool>("UseInMemoryDb");
+    if (useInMemory)
+    {
+        var dbName = builder.Configuration.GetValue<string>("InMemoryDbName") ?? "PaymentGatewayTests";
+        opt.UseInMemoryDatabase(dbName);
+    }
+    else
+    {
+        opt.UseSqlServer(builder.Configuration.GetConnectionString("Default"));
+    }
+});
 
-// Swagger
+
+
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
 
-// Swagger UI
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -27,8 +39,7 @@ app.UseHttpsRedirection();
 // Health 
 app.MapGet("/", () => Results.Ok(new { ok = true, service = "PaymentGateway.Api" }));
 
-
-//Create Customers
+// Create Customers (simple demo create using entity)
 app.MapPost("/customers", async (Customer customer, AppDbContext db) =>
 {
     customer.Id = Guid.NewGuid();
@@ -37,8 +48,7 @@ app.MapPost("/customers", async (Customer customer, AppDbContext db) =>
     return Results.Created($"/customers/{customer.Id}", customer);
 });
 
-
-//  update customer info
+// Update customer info
 app.MapPut("/customers/{id:guid}", async (Guid id, UpdateCustomerDto dto, AppDbContext db) =>
 {
     var customer = await db.Customers.FindAsync(id);
@@ -51,31 +61,28 @@ app.MapPut("/customers/{id:guid}", async (Guid id, UpdateCustomerDto dto, AppDbC
     return Results.Ok(new { updated = true, id = customer.Id, customer.Email, customer.FullName });
 });
 
-
-
-//  Customers 
+// Customers (list)
 app.MapGet("/customers", async (AppDbContext db) =>
     await db.Customers
         .Select(c => new { c.Id, c.FullName, c.Email })
         .ToListAsync());
 
-// Merchants 
+// Merchants (list)
 app.MapGet("/merchants", async (AppDbContext db) =>
     await db.Merchants
         .Select(m => new { m.Id, m.Name })
         .ToListAsync());
 
-//  create Payments
+// Create Payments
 app.MapPost("/payments", async (CreatePaymentDto dto, AppDbContext db) =>
 {
-    // validation
     var merchant = await db.Merchants.FindAsync(dto.MerchantId);
     var customer = await db.Customers.FindAsync(dto.CustomerId);
     var method = await db.PaymentMethods.FindAsync(dto.PaymentMethodId);
     if (merchant is null || customer is null || method is null)
         return Results.BadRequest(new { error = "Invalid merchant/customer/paymentMethod." });
 
-
+    // Check m-m support
     var supportsMethod = await db.MerchantPaymentMethods
         .AnyAsync(x => x.MerchantId == merchant.Id && x.PaymentMethodId == method.Id);
     if (!supportsMethod)
@@ -101,51 +108,42 @@ app.MapPost("/payments", async (CreatePaymentDto dto, AppDbContext db) =>
     return Results.Created($"/payments/{payment.Id}", response);
 });
 
-//  Payments
+//  GET by id 
 app.MapGet("/payments/{id:guid}", async (Guid id, AppDbContext db) =>
 {
-    var p = await db.Payments.FindAsync(id);
-    if (p is null) return Results.NotFound();
+    var p = await db.Payments
+        .Where(x => x.Id == id && !x.IsDeleted)
+        .Select(x => new PaymentResponseDto(
+            x.Id, x.MerchantId, x.CustomerId, x.PaymentMethodId,
+            x.Amount, x.Currency, x.Status.ToString(), x.CreatedAt))
+        .SingleOrDefaultAsync();
 
-    return Results.Ok(new PaymentResponseDto(
-        p.Id, p.MerchantId, p.CustomerId, p.PaymentMethodId,
-        p.Amount, p.Currency, p.Status.ToString(), p.CreatedAt));
+    return p is null ? Results.NotFound() : Results.Ok(p);
 });
 
-
-
-//  GET all for a merchant
+// GET all for a merchant 
 app.MapGet("/merchants/{merchantId:guid}/payments", async (Guid merchantId, AppDbContext db) =>
 {
     var merchant = await db.Merchants.FindAsync(merchantId);
     if (merchant is null) return Results.NotFound(new { error = "Merchant not found" });
 
     var payments = await db.Payments
-        .Where(p => p.MerchantId == merchantId)
+        .Where(p => p.MerchantId == merchantId && !p.IsDeleted)
         .Select(p => new PaymentResponseDto(
-            p.Id,
-            p.MerchantId,
-            p.CustomerId,
-            p.PaymentMethodId,
-            p.Amount,
-            p.Currency,
-            p.Status.ToString(),
-            p.CreatedAt
-        ))
+            p.Id, p.MerchantId, p.CustomerId, p.PaymentMethodId,
+            p.Amount, p.Currency, p.Status.ToString(), p.CreatedAt))
         .ToListAsync();
 
     return Results.Ok(payments);
 });
 
-
-// Payments
+// Hard delete 
 app.MapDelete("/payments/{id:guid}", async (Guid id, AppDbContext db) =>
 {
     var p = await db.Payments.FindAsync(id);
     if (p is null) return Results.NotFound();
 
-    // pretend refund logic:
-    if (p.Status == PaymentStatus.Captured || p.Status == PaymentStatus.Authorized)
+    if (p.Status is PaymentStatus.Captured or PaymentStatus.Authorized)
         p.Status = PaymentStatus.Refunded;
 
     db.Payments.Remove(p);
@@ -153,8 +151,7 @@ app.MapDelete("/payments/{id:guid}", async (Guid id, AppDbContext db) =>
     return Results.NoContent();
 });
 
-
-// Merchant-initiated refund 
+// Merchant initiated refund 
 app.MapDelete("/merchants/{merchantId:guid}/payments/{id:guid}", async (Guid merchantId, Guid id, AppDbContext db) =>
 {
     var payment = await db.Payments.FindAsync(id);
@@ -168,23 +165,19 @@ app.MapDelete("/merchants/{merchantId:guid}/payments/{id:guid}", async (Guid mer
 
     payment.Status = PaymentStatus.Refunded;
     payment.RefundedAt = DateTime.UtcNow;
-    payment.IsDeleted = true; // mark as deleted (optional)
+    payment.IsDeleted = true;
     await db.SaveChangesAsync();
 
     return Results.Ok(new { refunded = true, id = payment.Id, refundedAt = payment.RefundedAt });
 });
 
-
-
-//  Show Payment Methods
+// Payment list
 app.MapGet("/paymentmethods", async (AppDbContext db) =>
     await db.PaymentMethods
         .Select(pm => new { pm.Id, pm.Code, pm.DisplayName })
         .ToListAsync());
 
-
-
-//  Merchant's supported payment methods
+// Merchant's supported payment methods
 app.MapGet("/merchants/{id:guid}/paymentmethods", async (Guid id, AppDbContext db) =>
 {
     var merchant = await db.Merchants
@@ -200,8 +193,7 @@ app.MapGet("/merchants/{id:guid}/paymentmethods", async (Guid id, AppDbContext d
     return Results.Ok(supportedMethods);
 });
 
-
-//  Seed helper
+// Seed helper
 app.MapPost("/dev/seed", async (AppDbContext db) =>
 {
     if (!await db.Merchants.AnyAsync())
@@ -226,3 +218,6 @@ app.MapPost("/dev/seed", async (AppDbContext db) =>
 });
 
 app.Run();
+
+// For integration testing
+public partial class Program { }
